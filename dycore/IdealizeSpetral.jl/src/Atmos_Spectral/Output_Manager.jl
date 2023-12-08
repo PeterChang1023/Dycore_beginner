@@ -102,7 +102,7 @@ mutable struct Output_Manager
 
     rho_xyzt::Array{Float64,4}
 
-    qv_global_intergral_xyzt::Array{Float64, 4}
+    qv_global_intergral_xyzt::Array{Float64, 1}
 
 
 end
@@ -204,7 +204,7 @@ function Output_Manager(mesh::Spectral_Spherical_Mesh, vert_coord::Vert_Coordina
 
     rho_xyzt = zeros(Float64, nλ,  nθ, nd, n_day)
 
-    qv_global_intergral_xyzt = zeros(Float64, nλ,  nθ, nd, n_day)
+    qv_global_intergral_xyzt = zeros(Float64, n_day)
 
     Output_Manager(nλ, nθ, nd, n_day,
     day_to_sec, start_time, end_time, current_time, spinup_day,
@@ -369,7 +369,7 @@ function Update_Output!(output_manager::Output_Manager, dyn_data::Dyn_Data, curr
 
     rho_xyzt[:,:,:,i_day] .= dyn_data.rho[:,:,:]
 
-    qv_global_intergral_xyzt[:,:,:,i_day] .= dyn_data.qv_global_intergral[:,:,:]
+    qv_global_intergral_xyzt[i_day] = dyn_data.qv_global_intergral
 
     n_daily_mean[i_day] += 1
 end

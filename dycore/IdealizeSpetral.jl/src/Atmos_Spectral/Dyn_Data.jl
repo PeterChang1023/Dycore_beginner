@@ -189,8 +189,7 @@ mutable struct Dyn_Data
     
     rho::Array{Float64,3}
 
-    qv_global_intergral::Array{Float64, 3}
-
+    qv_global_intergral::Float64
 
 
     
@@ -363,7 +362,7 @@ function Dyn_Data(name::String, num_fourier::Int64, num_spherical::Int64, nλ::I
 
     rho = zeros(Float64, nλ,  nθ, nd)
 
-    qv_global_intergral = zeros(Float64, nλ,  nθ, nd)
+    qv_global_intergral = 0.
 
 
 
