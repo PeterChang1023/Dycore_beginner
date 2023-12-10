@@ -331,6 +331,8 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     K_E = dyn_data.K_E
     pqpz = dyn_data.pqpz
 
+    condensation_rate = dyn_data.condensation_rate
+
     # grid_ps = dyn_data.grid_ps_c
 
     ###############################################################################
@@ -361,8 +363,9 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     Pressure_Variables!(vert_coord, grid_ps, grid_p_half, grid_Δp, grid_lnp_half, grid_p_full, grid_lnp_full)
     ###
     ###
-    grid_tracers_diff_new = HS_forcing_water_vapor!(semi_implicit, grid_tracers_n,  grid_t_n, grid_δt, grid_p_full, grid_u, grid_v, factor3, grid_δtracers, grid_tracers_c, grid_t, grid_tracers_p, grid_t_p)
+    grid_tracers_diff_new, condensation_rate_loc = HS_forcing_water_vapor!(semi_implicit, grid_tracers_n,  grid_t_n, grid_δt, grid_p_full, grid_u, grid_v, factor3, grid_δtracers, grid_tracers_c, grid_t, grid_tracers_p, grid_t_p)
     grid_tracers_diff    .= grid_tracers_diff_new
+    condensation_rate    .= condensation_rate_loc
     grid_tracers_c[grid_tracers_c .< 0] .= 0 
     ##
     C_E = 0.0044
@@ -408,69 +411,11 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     grid_δtracers[:,:,20] .+= factor1[:,:,20] ./(Δt)
     # ###
     ### precipitation, add water then surface flux
-    """
+    
     # # eddy diffusivity coefficient, K_E
     # spe_δtracers   .= 0.
     # grid_δtracers  .= 0.
-    
-    V_a = V_c[:,:,20]
-    for i in 17:21
-        K_E[:,:,i] .= C_E .* V_a .* za[:,:,1]
-    end
-    K_E[:,:, 1:16] .= C_E .* V_a .* za[:,:,1] .* exp.(-((grid_p_half[:,:,17] .- grid_p_half[:,:,1:16]) ./ 10000.).^2)
-    ### cal PBL Scheme
-    rpdel  = zeros(((128,64,20))) ### = 1 / (p^n_{+} - p^n_{-}) , which p^_{-} mean upper layer
-    for i in 1:20
-        rpdel[:,:,i] .= 1. ./ (grid_p_half[:,:,i+1] .- grid_p_half[:,:,i])
-    end
 
-    CA     = zeros(((128,64,20)))
-    CC     = zeros(((128,64,20)))
-    CE     = zeros(((128,64,20+1)))
-    CF     = zeros(((128,64,20+1)))
-
-    for k in 1:19
-        CA[:,:,k]   .= (rpdel[:,:,k]   .* 2. .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2 
-                       ./ (grid_p_full[:,:,k+1] .- grid_p_full[:,:,k]))
-        CC[:,:,k+1] .= (rpdel[:,:,k+1] .* 2. .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2
-                       ./ (grid_p_full[:,:,k+1] .- grid_p_full[:,:,k]))
-    end
-    # @info maximum(rpdel) ## OK
-    # @info maximum(rho) ## OK
-    # @info maximum(grid_p_full[:,:,18+1] .- grid_p_full[:,:,18]) # # OK
-    
-    CA[:,:,20]   .= 0.
-    CC[:,:, 1]   .= 0.
-    CE[:,:,21]   .= 0.
-    CF[:,:,21]   .= 0.
-    # @info minimum(CA)
-    # @info minimum(CC)
-
-
-    for k in 20:-1:1
-        CE[:,:,k]    .= CC[:,:,k] ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1])
-        CF[:,:,k]    .= ((grid_tracers_c[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
-                        ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
-    end
-    # @info maximum(CE)
-    # @info maximum(CF)
-
-    # first calculate the updates at the top model level
-    # grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_c[:,:,1]) ./ (2. .* Δt)
-    ### WARNING factor1 just factor, so it did  ./ ./ (2. .* Δt). 
-    ### So did factor2
-    factor2[:,:,1]        .= (CF[:,:,1] .- grid_tracers_c[:,:,1]) #./ (2. .* Δt)  # because CE at top = 0
-    grid_tracers_c[:,:,1] .= CF[:,:,1] 
-    # Loop over the remaining level
-    for k in 2:19
-        grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_c[:,:,k]) ./ (2. .* Δt)
-        factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_c[:,:,k])  #./ (2. .* Δt)
-        grid_tracers_c[:,:,k]  .=  CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k]
-    end
-    # @info maximum(CE), minimum(CE)
-    # @info maximum(CF), minimum(CF)
-    """
-    ###
     # compute ∇ps = ∇lnps * ps
     Compute_Gradients!(mesh, spe_lnps_c,  grid_dλ_ps, grid_dθ_ps)
     grid_dλ_ps .*= grid_ps
@@ -579,6 +524,65 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     # factor1_loc, factor2_loc, factor3_loc, K_E_loc, rho_loc,
     # @info maximum(factor1), minimum(factor1)
     # @info maximum(factor2), minimum(factor2)
+    
+    V_a = V_c[:,:,20]
+    for i in 17:21
+        K_E[:,:,i] .= C_E .* V_a .* za[:,:,1]
+    end
+    K_E[:,:, 1:16] .= C_E .* V_a .* za[:,:,1] .* exp.(-((grid_p_half[:,:,17] .- grid_p_half[:,:,1:16]) ./ 10000.).^2)
+    ### cal PBL Scheme
+    rpdel  = zeros(((128,64,20))) ### = 1 / (p^n_{+} - p^n_{-}) , which p^_{-} mean upper layer
+    for i in 1:20
+        rpdel[:,:,i] .= 1. ./ (grid_p_half[:,:,i+1] .- grid_p_half[:,:,i])
+    end
+
+    CA     = zeros(((128,64,20)))
+    CC     = zeros(((128,64,20)))
+    CE     = zeros(((128,64,20+1)))
+    CF     = zeros(((128,64,20+1)))
+
+    for k in 1:19
+        CA[:,:,k]   .= (rpdel[:,:,k]   .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2 
+                       ./ (grid_p_full[:,:,k+1] .- grid_p_full[:,:,k]))
+        CC[:,:,k+1] .= (rpdel[:,:,k+1] .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2
+                       ./ (grid_p_full[:,:,k+1] .- grid_p_full[:,:,k]))
+    end
+    # @info maximum(rpdel) ## OK
+    # @info maximum(rho) ## OK
+    # @info maximum(grid_p_full[:,:,18+1] .- grid_p_full[:,:,18]) # # OK
+    
+    CA[:,:,20]   .= 0.
+    CC[:,:, 1]   .= 0.
+    CE[:,:,21]   .= 0.
+    CF[:,:,21]   .= 0.
+    # @info minimum(CA)
+    # @info minimum(CC)
+
+
+    for k in 20:-1:1
+        CE[:,:,k]    .= CC[:,:,k] ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1])
+        CF[:,:,k]    .= ((grid_tracers_p[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
+                        ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
+    end
+    # @info maximum(CE)
+    # @info maximum(CF)
+
+    # first calculate the updates at the top model level
+    grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_c[:,:,1]) ./ (Δt)
+    ### WARNING factor1 just factor, so it did  ./ ./ (2. .* Δt). 
+    ### So did factor2
+    factor2[:,:,1]        .= (CF[:,:,1] .- grid_tracers_c[:,:,1]) #./ (2. .* Δt)  # because CE at top = 0
+    grid_tracers_c[:,:,1] .= CF[:,:,1] 
+    # Loop over the remaining level
+    for k in 2:20
+        grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_c[:,:,k]) ./ (Δt)
+        factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_c[:,:,k])  #./ (2. .* Δt)
+        grid_tracers_c[:,:,k]  .=  CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k]
+    end
+    # @info maximum(CE), minimum(CE)
+    # @info maximum(CF), minimum(CF)
+    
+    ###
      new_grid_tracers_n_loc, mean_moisture_p_loc, mean_moisture_c_loc, mean_moisture_n_loc = Compute_Corrections!(semi_implicit, vert_coord, mesh, atmo_data, mean_ps_p, mean_energy_p,mean_moisture_p, 
         grid_u_n, grid_v_n,
         grid_energy_full, grid_ps_p,grid_ps,
@@ -874,8 +878,8 @@ function HS_forcing_water_vapor!(semi_implicit::Semi_Implicit_Solver, grid_trace
     grid_tracers_c_max  = deepcopy(grid_tracers_c)
     grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) 
     grid_tracers_diff  .= (max.(grid_tracers_c, grid_tracers_c_max) .- grid_tracers_c_max) 
-    condensation_rate = (grid_tracers_diff)./ (1. .+ (Lv/cp)*(Lv .* grid_tracers_c_max ./ (Rv .* grid_t.^2))) ./ (Δt)
-    grid_tracers_c .-= condensation_rate #.* (2. * Δt)
+    condensation_rate = (grid_tracers_diff)./ (1. .+ (Lv/cp)*(Lv .* grid_tracers_c_max ./ (Rv .* grid_t.^2))) ./ (2 .* Δt)
+    grid_tracers_c .-= condensation_rate .* (2. * Δt)
     # grid_δtracers .-= condensation_rate # ./ (2 .* Δt)
     
 
@@ -914,9 +918,10 @@ function HS_forcing_water_vapor!(semi_implicit::Semi_Implicit_Solver, grid_trace
     ### original
     #grid_tracers_diff  .= factor3 #./ (1 .+ Lv ./ cp .* Lv .* grid_tracers_c_max ./ Rv ./ grid_t .^2) #./ (2*Δt)
     factor3 .= condensation_rate #.* (2. * Δt)
-    grid_δt  .+= (condensation_rate  .* Lv ./ cp) ./day_to_sec .* L 
+    # grid_δt  .+= (condensation_rate  .* Lv ./ cp) ./day_to_sec .* L 
+    grid_t  .+= (condensation_rate .* (2. * Δt) .* Lv ./ cp) ./day_to_sec .* L 
     ###
-    return grid_tracers_diff
+    return grid_tracers_diff, condensation_rate
 end
 
 

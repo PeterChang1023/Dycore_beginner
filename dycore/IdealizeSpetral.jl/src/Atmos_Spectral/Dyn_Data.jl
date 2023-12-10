@@ -190,6 +190,8 @@ mutable struct Dyn_Data
     rho::Array{Float64,3}
 
     qv_global_intergral::Float64
+    condensation_rate::Array{Float64,3}
+    
 
 
     
@@ -363,8 +365,7 @@ function Dyn_Data(name::String, num_fourier::Int64, num_spherical::Int64, nλ::I
     rho = zeros(Float64, nλ,  nθ, nd)
 
     qv_global_intergral = 0.
-
-
+    condensation_rate = zeros(Float64, nλ,  nθ, nd)
 
 
     
@@ -397,7 +398,7 @@ function Dyn_Data(name::String, num_fourier::Int64, num_spherical::Int64, nλ::I
     grid_z_full, grid_z_half,grid_t_eq,
     #########################################################################
     spe_d1, spe_d2, grid_d_full1, grid_d_full2, grid_d_half1, grid_d_half2,
-    spe_zeros, grid_t_eq_ref, grid_tracers_ref, spe_tracers_ref, unsaturated_n, add_water, factor1, factor2, factor3, factor4, K_E, pqpz, rho,  qv_global_intergral)
+    spe_zeros, grid_t_eq_ref, grid_tracers_ref, spe_tracers_ref, unsaturated_n, add_water, factor1, factor2, factor3, factor4, K_E, pqpz, rho,  qv_global_intergral, condensation_rate)
 end
 
 function Time_Advance!(dyn_data::Dyn_Data)
