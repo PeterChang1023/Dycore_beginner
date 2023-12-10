@@ -407,8 +407,8 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
 
     ### 1205 1205_25day_factor1_with_tracers_c_and_factor3_final.dat test factor1 use grid_tracers_c and grid_tracers_c_max and add on grid_δtracers, without factor2
     factor1[:,:,20] .=  C_E .* V_c[:,:,20] .* (grid_tracers_c_max[:,:,20] .- min.(grid_tracers_c[:,:,20], grid_tracers_c_max[:,:,20])) ./ za[:,:,1] 
-    # grid_tracers_c[:,:,20] .+= factor1[:,:,20]
-    grid_δtracers[:,:,20] .+= factor1[:,:,20] ./(Δt)
+    grid_tracers_c[:,:,20] .+= factor1[:,:,20]
+    # grid_δtracers[:,:,20] .+= factor1[:,:,20] ./(Δt)
     # ###
     ### precipitation, add water then surface flux
     
