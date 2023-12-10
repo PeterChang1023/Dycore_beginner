@@ -111,15 +111,20 @@ function Compute_Corrections!(semi_implicit::Semi_Implicit_Solver, vert_coord::V
         # mean_factor_all_n      =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, factor_all, grid_ps_n)
         # factor_all           .*= (mean_moisture_p-mean_moisture_n)/mean_factor_all_n
 
+        ### correction n
         grid_tracers_n[grid_tracers_n .< 0.] .= 0.
-        mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
         mean_moisture_n       =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_n, grid_ps_n)
         grid_tracers_n     .*= (mean_moisture_p / mean_moisture_n) 
         grid_tracers_n[grid_tracers_n .< 0.] .= 0.
         mean_moisture_n  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_n, grid_ps_n)
-        
+        ###
+        ### correct c
+        grid_tracers_c[grid_tracers_c .< 0.] .= 0.
+        mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
+        grid_tracers_c     .*= (mean_moisture_p / mean_moisture_c) 
+        grid_tracers_c[grid_tracers_c .< 0.] .= 0.
+        mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
         ### 10/30 
-        mean_moisture_n  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_n, grid_ps_n)
         
         
         # @info "#### mass correction:", (mean_moisture_p), (mean_moisture_c), (mean_moisture_n) , (mean_moisture_n - mean_moisture_p)
