@@ -524,7 +524,9 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     # factor1_loc, factor2_loc, factor3_loc, K_E_loc, rho_loc,
     # @info maximum(factor1), minimum(factor1)
     # @info maximum(factor2), minimum(factor2)
-    
+    ###
+    """
+    # origin factor2
     V_a = V_c[:,:,20]
     for i in 17:21
         K_E[:,:,i] .= C_E .* V_a .* za[:,:,1]
@@ -561,27 +563,28 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
 
     for k in 20:-1:1
         CE[:,:,k]    .= CC[:,:,k] ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1])
-        CF[:,:,k]    .= ((grid_tracers_p[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
+        CF[:,:,k]    .= ((grid_tracers_c[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
                         ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
     end
     # @info maximum(CE)
     # @info maximum(CF)
-
+    
+    
     # first calculate the updates at the top model level
-    grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_c[:,:,1]) ./ (Δt)
+    grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_n[:,:,1]) ./ (Δt)
     ### WARNING factor1 just factor, so it did  ./ ./ (2. .* Δt). 
     ### So did factor2
-    factor2[:,:,1]        .= (CF[:,:,1] .- grid_tracers_c[:,:,1]) #./ (2. .* Δt)  # because CE at top = 0
-    grid_tracers_c[:,:,1] .= CF[:,:,1] 
+    factor2[:,:,1]        .= (CF[:,:,1] .- grid_tracers_n[:,:,1]) #./ (2. .* Δt)  # because CE at top = 0
+    grid_tracers_n[:,:,1] .= CF[:,:,1] 
     # Loop over the remaining level
     for k in 2:20
-        grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_c[:,:,k]) ./ (Δt)
-        factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_c[:,:,k])  #./ (2. .* Δt)
-        grid_tracers_c[:,:,k]  .=  CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k]
+        grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k]) ./ (Δt)
+        factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k])  #./ (2. .* Δt)
+        grid_tracers_n[:,:,k]  .=  CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k]
     end
     # @info maximum(CE), minimum(CE)
     # @info maximum(CF), minimum(CF)
-    
+    """
     ###
      new_grid_tracers_n_loc, mean_moisture_p_loc, mean_moisture_c_loc, mean_moisture_n_loc = Compute_Corrections!(semi_implicit, vert_coord, mesh, atmo_data, mean_ps_p, mean_energy_p,mean_moisture_p, 
         grid_u_n, grid_v_n,
@@ -592,8 +595,7 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
         grid_t, grid_p_full, grid_p_half, grid_z_full, grid_u_p, grid_v_p, grid_geopots, grid_w_full, grid_t_p, dyn_data, grid_δt, factor1, factor2)
 
     grid_tracers_n .= new_grid_tracers_n_loc
-
-    ###
+    
     # factor1 .= factor1_loc
     # factor2 .= factor2_loc
     # factor3 .= factor3_loc
@@ -622,6 +624,64 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     end
     # original
     Time_Advance!(dyn_data)
+    #######################################################################################
+        V_a = V_c[:,:,20]
+    for i in 17:21
+        K_E[:,:,i] .= C_E .* V_a .* za[:,:,1]
+    end
+    K_E[:,:, 1:16] .= C_E .* V_a .* za[:,:,1] .* exp.(-((grid_p_half[:,:,17] .- grid_p_half[:,:,1:16]) ./ 10000.).^2)
+    ### cal PBL Scheme
+    rpdel  = zeros(((128,64,20))) ### = 1 / (p^n_{+} - p^n_{-}) , which p^_{-} mean upper layer
+    for i in 1:20
+        rpdel[:,:,i] .= 1. ./ (grid_p_half[:,:,i+1] .- grid_p_half[:,:,i])
+    end
+
+    CA     = zeros(((128,64,20)))
+    CC     = zeros(((128,64,20)))
+    CE     = zeros(((128,64,20+1)))
+    CF     = zeros(((128,64,20+1)))
+
+    for k in 1:19
+        CA[:,:,k]   .= (rpdel[:,:,k]   .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2 
+                       ./ (grid_p_full[:,:,k+1] .- grid_p_full[:,:,k]))
+        CC[:,:,k+1] .= (rpdel[:,:,k+1] .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2
+                       ./ (grid_p_full[:,:,k+1] .- grid_p_full[:,:,k]))
+    end
+    # @info maximum(rpdel) ## OK
+    # @info maximum(rho) ## OK
+    # @info maximum(grid_p_full[:,:,18+1] .- grid_p_full[:,:,18]) # # OK
+    
+    CA[:,:,20]   .= 0.
+    CC[:,:, 1]   .= 0.
+    CE[:,:,21]   .= 0.
+    CF[:,:,21]   .= 0.
+    # @info minimum(CA)
+    # @info minimum(CC)
+
+
+    for k in 20:-1:1
+        CE[:,:,k]    .= CC[:,:,k] ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1])
+        CF[:,:,k]    .= ((grid_tracers_c[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
+                        ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
+    end
+    # @info maximum(CE)
+    # @info maximum(CF)
+        # first calculate the updates at the top model level
+    grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_n[:,:,1]) ./ (Δt)
+    ### WARNING factor1 just factor, so it did  ./ ./ (2. .* Δt). 
+    ### So did factor2
+    factor2[:,:,1]        .= (CF[:,:,1] .- grid_tracers_n[:,:,1]) #./ (2. .* Δt)  # because CE at top = 0
+    grid_tracers_n[:,:,1] .= CF[:,:,1] 
+    # Loop over the remaining level
+    for k in 2:20
+        grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k]) ./ (Δt)
+        factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k])  #./ (2. .* Δt)
+        grid_tracers_n[:,:,k]  .=  CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k]
+    end
+    # @info maximum(CE), minimum(CE)
+    # @info maximum(CF), minimum(CF)
+    ###
+    ################################################################################
     mean_moisture_n  =  mean_moisture_c_loc
     mean_moisture_c  =  mean_moisture_c_loc
     mean_moisture_p  =  mean_moisture_p_loc
