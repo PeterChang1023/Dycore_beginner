@@ -410,11 +410,27 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     grid_tracers_c[:,:,20] .+= factor1[:,:,20]
     # grid_δtracers[:,:,20] .+= factor1[:,:,20] ./(Δt)
     # ###
-    ### precipitation, add water then surface flux
-    
-    # # eddy diffusivity coefficient, K_E
-    # spe_δtracers   .= 0.
-    # grid_δtracers  .= 0.
+    ############################################################
+    ### try latent heat flux
+        ### 12/11 add Sensible heat flux
+    # step 1. set Sea surface temperature
+    # θc = mesh.θc
+    # Tsurf = zeros((128,64))
+    # Tsurf .= grid_t[:,:,20]
+    # for i in 1:64
+    #     Tsurf[:,i] .= 29. .* exp.(-θc[i] .^2.) ./ (2 * (26. * pi / 180.)^2.) .+ 271.
+    # end
+
+    # grid_δt[:,:,20] .+= ((grid_t[:,:,20] .+ C_E .* V_c[:,:,20] .* (Tsurf[:,:]) .* Δt ./ za[:,:,1]
+                       # ./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_t[:,:,20]) ./ Δt)
+    # grid_t[:,:,20] .+= ((C_E .* V_c[:,:,1] .* Tsurf[:,:] .* Δt ./ za) 
+                       # ./ ((1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1])))
+    # add latent heat flux
+    # grid_tracers_c_max  = deepcopy(grid_tracers_c)
+    # grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) ))
+    # grid_δtracers[:,:,20] .+= ((grid_tracers_c[:,:,20] .+ C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1]
+                               # ./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_tracers_c[:,:,20]) ./ Δt)
+#######################################################################################
 
     # compute ∇ps = ∇lnps * ps
     Compute_Gradients!(mesh, spe_lnps_c,  grid_dλ_ps, grid_dθ_ps)
