@@ -426,10 +426,11 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     # grid_t[:,:,20] .+= ((C_E .* V_c[:,:,1] .* Tsurf[:,:] .* Δt ./ za) 
                        # ./ ((1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1])))
     # add latent heat flux
-    # grid_tracers_c_max  = deepcopy(grid_tracers_c)
-    # grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) ))
-    # grid_δtracers[:,:,20] .+= ((grid_tracers_c[:,:,20] .+ C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1]
-                               # ./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_tracers_c[:,:,20]) ./ Δt)
+    grid_tracers_c_max  = deepcopy(grid_tracers_c)
+    grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) ))
+    # grid_δtracers[:,:,20] .+= ((grid_tracers_c[:,:,20] .+ C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1])./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_tracers_c[:,:,20]) ./ Δt
+    grid_tracers_c[:,:,20] .+= C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1] ./ (1. .+ C_E.*V_c[:,:,20] .* Δt./ za[:,:,1])
+    
 #######################################################################################
 
     # compute ∇ps = ∇lnps * ps
@@ -641,7 +642,7 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     # original
     Time_Advance!(dyn_data)
     #######################################################################################
-        V_a = V_c[:,:,20]
+    V_a = V_c[:,:,20]
     for i in 17:21
         K_E[:,:,i] .= C_E .* V_a .* za[:,:,1]
     end
