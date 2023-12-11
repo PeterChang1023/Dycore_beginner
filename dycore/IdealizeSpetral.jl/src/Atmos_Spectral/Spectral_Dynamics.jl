@@ -425,6 +425,7 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
                        # ./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_t[:,:,20]) ./ Δt)
     # grid_t[:,:,20] .+= ((C_E .* V_c[:,:,1] .* Tsurf[:,:] .* Δt ./ za) 
                        # ./ ((1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1])))
+    """
     # add latent heat flux
     grid_tracers_c_max  = deepcopy(grid_tracers_c)
     grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) ))
@@ -433,6 +434,7 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     grid_tracers_c[:,:,20] .+= C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1] ./ (1. .+ C_E.*V_c[:,:,20] .* Δt./ za[:,:,1])
 
     factor4 .= C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1] ./ (1. .+ C_E.*V_c[:,:,20] .* Δt./ za[:,:,1])
+    """
 #######################################################################################
 
     # compute ∇ps = ∇lnps * ps
@@ -659,6 +661,8 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     CC     = zeros(((128,64,20)))
     CE     = zeros(((128,64,20+1)))
     CF     = zeros(((128,64,20+1)))
+    CFt    = zeros(((128,64,20+1)))
+    
 
     for k in 1:19
         CA[:,:,k]   .= (rpdel[:,:,k]   .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2 
@@ -676,23 +680,33 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     CF[:,:,21]   .= 0.
     # @info minimum(CA)
     # @info minimum(CC)
-
+    p0 = 100000.
 
     for k in 20:-1:1
         CE[:,:,k]    .= CC[:,:,k] ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1])
         CF[:,:,k]    .= ((grid_tracers_c[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
                         ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
+        CFt[:,:,k]   .= ((p0./grid_p_full[:,:,k]).^(Rd/cp) .* grid_t[:,:,k] .+ CA[:,:,k] .* CFt[:,:,k+1]
+                        ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k]))
     end
     # @info maximum(CE)
     # @info maximum(CF)
         # first calculate the updates at the top model level
-    grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_n[:,:,1]) ./ (Δt)
+    grid_δt[:,:,1] .+= (CFt[:,:,1] .* (grid_p_full[:,:,1]./p0).^(Rd/cp).-grid_t_n[:,:,1])./(Δt)
+    grid_t[:,:,1]   .= CFt[:,:,1] .* (grid_p_full[:,:,1] ./p0) .^(Rd/cp)
     ### WARNING factor1 just factor, so it did  ./ ./ (2. .* Δt). 
     ### So did factor2
     factor2[:,:,1]        .= (CF[:,:,1] .- grid_tracers_n[:,:,1]) #./ (2. .* Δt)  # because CE at top = 0
+    grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_n[:,:,1]) ./ (Δt)
     grid_tracers_n[:,:,1] .= CF[:,:,1] 
     # Loop over the remaining level
     for k in 2:20
+        grid_δt[:,:,k] .+= (CE[:,:,k] .* grid_t_n[:,:,k-1] 
+                            .* (p0 ./ grid_p_full[:,:,k-1]).^ (Rd/cp) .+ CFt[:,:,k]
+                            .* (grid_p_full[:,:,k]./p0).^(Rd/cp).-grid_t_n[:,:,k]./(Δt))
+        grid_t_n[:,:,1]   .= ((CE[:,:,k] .* grid_t_n[:,:,k-1] .* (p0 ./ grid_p_full[:,:,k-1]) .^ (Rd/cp) .+ CFt[:,:,k])
+                            .* (grid_p_full[:,:,k]./p0).^ (Rd/cp))
+        
         grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k]) ./ (Δt)
         factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k])  #./ (2. .* Δt)
         grid_tracers_n[:,:,k]  .=  CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k]
