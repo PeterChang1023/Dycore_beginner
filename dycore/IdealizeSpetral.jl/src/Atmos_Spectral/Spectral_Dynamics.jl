@@ -362,12 +362,7 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     # compute pressure based on grid_ps -> grid_p_half, grid_lnp_half, grid_p_full, grid_lnp_full 
     Pressure_Variables!(vert_coord, grid_ps, grid_p_half, grid_Δp, grid_lnp_half, grid_p_full, grid_lnp_full)
     ###
-    ###
-    grid_tracers_diff_new, condensation_rate_loc = HS_forcing_water_vapor!(semi_implicit, grid_tracers_n,  grid_t_n, grid_δt, grid_p_full, grid_u, grid_v, factor3, grid_δtracers, grid_tracers_c, grid_t, grid_tracers_p, grid_t_p)
-    grid_tracers_diff    .= grid_tracers_diff_new
-    condensation_rate    .= condensation_rate_loc
-    grid_tracers_c[grid_tracers_c .< 0] .= 0 
-    ##
+    ############################################################
     C_E = 0.0044
     Lv = 2.5*10^6.
     Rv = 461.
@@ -401,16 +396,6 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
 
     za[:,:,1] .= (Rd .* tv./9.81 .* (log.(grid_ps[:,:,1]) ./ ((grid_p_full[:,:,20] .+ grid_p_half[:,:,21]) ./ 2.) ) ./2)
     ### 
-
-    grid_tracers_c_max  = deepcopy(grid_tracers_c)
-    grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) 
-
-    ### 1205 1205_25day_factor1_with_tracers_c_and_factor3_final.dat test factor1 use grid_tracers_c and grid_tracers_c_max and add on grid_δtracers, without factor2
-    factor1[:,:,20] .=  C_E .* V_c[:,:,20] .* (grid_tracers_c_max[:,:,20] .- min.(grid_tracers_c[:,:,20], grid_tracers_c_max[:,:,20])) ./ za[:,:,1] 
-    grid_tracers_c[:,:,20] .+= factor1[:,:,20]
-    # grid_δtracers[:,:,20] .+= factor1[:,:,20] ./(Δt)
-    # ###
-    ############################################################
     ### try latent heat flux
         ### 12/11 add Sensible heat flux
     # step 1. set Sea surface temperature
@@ -425,17 +410,34 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
                        # ./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_t[:,:,20]) ./ Δt)
     # grid_t[:,:,20] .+= ((C_E .* V_c[:,:,1] .* Tsurf[:,:] .* Δt ./ za) 
                        # ./ ((1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1])))
-    """
+    
     # add latent heat flux
+    
     grid_tracers_c_max  = deepcopy(grid_tracers_c)
     grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) ))
     
-    grid_δtracers[:,:,20] .= grid_δtracers[:,:,20] .+ ((grid_tracers_c[:,:,20] .+ C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1])./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_tracers_c[:,:,20]) ./ Δt
-    grid_tracers_c[:,:,20] .+= C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1] ./ (1. .+ C_E.*V_c[:,:,20] .* Δt./ za[:,:,1])
+    # grid_δtracers[:,:,20] .= grid_δtracers[:,:,20] .+ ((grid_tracers_c[:,:,20] .+ C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1])./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_tracers_c[:,:,20]) ./ Δt
+    grid_tracers_c[:,:,20] .+= C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* (2. .*Δt) ./ za[:,:,1] ./ (1. .+ C_E.*V_c[:,:,20] .* 2. .* Δt./ za[:,:,1])
 
     factor4 .= C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1] ./ (1. .+ C_E.*V_c[:,:,20] .* Δt./ za[:,:,1])
-    """
+   
 #######################################################################################
+    ###
+    grid_tracers_diff_new, condensation_rate_loc = HS_forcing_water_vapor!(semi_implicit, grid_tracers_n,  grid_t_n, grid_δt, grid_p_full, grid_u, grid_v, factor3, grid_δtracers, grid_tracers_c, grid_t, grid_tracers_p, grid_t_p)
+    grid_tracers_diff    .= grid_tracers_diff_new
+    condensation_rate    .= condensation_rate_loc
+    grid_tracers_c[grid_tracers_c .< 0] .= 0 
+    ##
+
+
+    grid_tracers_c_max  = deepcopy(grid_tracers_c)
+    grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) 
+
+    ### 1205 1205_25day_factor1_with_tracers_c_and_factor3_final.dat test factor1 use grid_tracers_c and grid_tracers_c_max and add on grid_δtracers, without factor2
+    factor1[:,:,20] .=  C_E .* V_c[:,:,20] .* (grid_tracers_c_max[:,:,20] .- min.(grid_tracers_c[:,:,20], grid_tracers_c_max[:,:,20])) ./ za[:,:,1] 
+    grid_tracers_c[:,:,20] .+= factor1[:,:,20]
+    # grid_δtracers[:,:,20] .+= factor1[:,:,20] ./(Δt)
+    # ###
 
     # compute ∇ps = ∇lnps * ps
     Compute_Gradients!(mesh, spe_lnps_c,  grid_dλ_ps, grid_dθ_ps)
@@ -529,6 +531,7 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     grid_ps_n .= exp.(grid_lnps)
     Trans_Spherical_To_Grid!(mesh, spe_t_n, grid_t_n) 
 
+    
     ### By CJY2
     Vert_Advection!(vert_coord, grid_tracers_c, grid_Δp, grid_M_half, Δt, vert_coord.vert_advect_scheme,  grid_δQ)
     grid_δtracers .+= grid_δQ 
@@ -546,105 +549,6 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     # @info maximum(factor1), minimum(factor1)
     # @info maximum(factor2), minimum(factor2)
     ###
-    """
-    # origin factor2
-    V_a = V_c[:,:,20]
-    for i in 17:21
-        K_E[:,:,i] .= C_E .* V_a .* za[:,:,1]
-    end
-    K_E[:,:, 1:16] .= C_E .* V_a .* za[:,:,1] .* exp.(-((grid_p_half[:,:,17] .- grid_p_half[:,:,1:16]) ./ 10000.).^2)
-    ### cal PBL Scheme
-    rpdel  = zeros(((128,64,20))) ### = 1 / (p^n_{+} - p^n_{-}) , which p^_{-} mean upper layer
-    for i in 1:20
-        rpdel[:,:,i] .= 1. ./ (grid_p_half[:,:,i+1] .- grid_p_half[:,:,i])
-    end
-
-    CA     = zeros(((128,64,20)))
-    CC     = zeros(((128,64,20)))
-    CE     = zeros(((128,64,20+1)))
-    CF     = zeros(((128,64,20+1)))
-
-    for k in 1:19
-        CA[:,:,k]   .= (rpdel[:,:,k]   .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2 
-                       ./ (grid_p_full[:,:,k+1] .- grid_p_full[:,:,k]))
-        CC[:,:,k+1] .= (rpdel[:,:,k+1] .* Δt .* grav.^2 .* K_E[:,:,k+1]   .* rho[:,:,k+1].^2
-                       ./ (grid_p_full[:,:,k+1] .- grid_p_full[:,:,k]))
-    end
-    # @info maximum(rpdel) ## OK
-    # @info maximum(rho) ## OK
-    # @info maximum(grid_p_full[:,:,18+1] .- grid_p_full[:,:,18]) # # OK
-    
-    CA[:,:,20]   .= 0.
-    CC[:,:, 1]   .= 0.
-    CE[:,:,21]   .= 0.
-    CF[:,:,21]   .= 0.
-    # @info minimum(CA)
-    # @info minimum(CC)
-
-
-    for k in 20:-1:1
-        CE[:,:,k]    .= CC[:,:,k] ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1])
-        CF[:,:,k]    .= ((grid_tracers_c[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
-                        ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
-    end
-    # @info maximum(CE)
-    # @info maximum(CF)
-    
-    
-    # first calculate the updates at the top model level
-    grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_n[:,:,1]) ./ (Δt)
-    ### WARNING factor1 just factor, so it did  ./ ./ (2. .* Δt). 
-    ### So did factor2
-    factor2[:,:,1]        .= (CF[:,:,1] .- grid_tracers_n[:,:,1]) #./ (2. .* Δt)  # because CE at top = 0
-    grid_tracers_n[:,:,1] .= CF[:,:,1] 
-    # Loop over the remaining level
-    for k in 2:20
-        grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k]) ./ (Δt)
-        factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k])  #./ (2. .* Δt)
-        grid_tracers_n[:,:,k]  .=  CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k]
-    end
-    # @info maximum(CE), minimum(CE)
-    # @info maximum(CF), minimum(CF)
-    """
-    ###
-     new_grid_tracers_n_loc, mean_moisture_p_loc, mean_moisture_c_loc, mean_moisture_n_loc = Compute_Corrections!(semi_implicit, vert_coord, mesh, atmo_data, mean_ps_p, mean_energy_p,mean_moisture_p, 
-        grid_u_n, grid_v_n,
-        grid_energy_full, grid_ps_p,grid_ps,
-        grid_ps_n, spe_lnps_n, 
-        grid_t_n, spe_t_n, 
-        grid_tracers_p, grid_tracers_c, grid_tracers_n,
-        grid_t, grid_p_full, grid_p_half, grid_z_full, grid_u_p, grid_v_p, grid_geopots, grid_w_full, grid_t_p, dyn_data, grid_δt, factor1, factor2)
-
-    grid_tracers_n .= new_grid_tracers_n_loc
-    
-    # factor1 .= factor1_loc
-    # factor2 .= factor2_loc
-    # factor3 .= factor3_loc
-
-    add_water .= factor1 .+ factor2
-
-    # K_E .= K_E_loc
-    # pqpz .= pqpz_loc
-
-    # rho .= rho_loc
-
-    # qv_global_intergral_p = mean_moisture_p_loc
-    qv_global_intergral = mean_moisture_c_loc
-    # qv_global_intergral_n = mean_moisture_n_loc
-    
-    
-
-    # @info "#### e04 mass correction:", (qv_global_intergral) #, (mean_moisture_n - mean_moisture_p)
-    ###
-
-    day_to_sec = 86400
-    if (integrator.time%day_to_sec == 0)
-        # dyn_data.grid_tracers_c[dyn_data.grid_tracers_c .< 0] .= 0
-        @info "Day: ", div(integrator.time,day_to_sec), " Max |U|,|V|,|P|,|T|,|qv|: ", maximum(abs.(dyn_data.grid_u_c)), maximum(abs.(dyn_data.grid_v_c)), maximum(dyn_data.grid_p_full), maximum(dyn_data.grid_t_c), maximum(dyn_data.grid_tracers_c)
-        @info "Day: ", div(integrator.time,day_to_sec), " Min |U|,|V|,|P|,|T|,|qv|: ", minimum(abs.(dyn_data.grid_u_c)), minimum(abs.(dyn_data.grid_v_c)), minimum(dyn_data.grid_p_full), minimum(dyn_data.grid_t_c), minimum(dyn_data.grid_tracers_c)
-    end
-    # original
-    Time_Advance!(dyn_data)
     #######################################################################################
     V_a = V_c[:,:,20]
     for i in 17:21
@@ -678,6 +582,7 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     CC[:,:, 1]   .= 0.
     CE[:,:,21]   .= 0.
     CF[:,:,21]   .= 0.
+    CFt[:,:,21]  .= 0.
     # @info minimum(CA)
     # @info minimum(CC)
     p0 = 100000.
@@ -686,27 +591,30 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
         CE[:,:,k]    .= CC[:,:,k] ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1])
         CF[:,:,k]    .= ((grid_tracers_c[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
                         ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
-        CFt[:,:,k]   .= ((p0./grid_p_full[:,:,k]).^(Rd/cp) .* grid_t[:,:,k] .+ CA[:,:,k] .* CFt[:,:,k+1]
-                        ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k]))
+        # CFt[:,:,k]   .= ((p0./grid_p_full[:,:,k]).^(Rd/cp) .* grid_t[:,:,k] .+ CA[:,:,k] .* CFt[:,:,k+1]
+                        # ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
     end
     # @info maximum(CE)
     # @info maximum(CF)
         # first calculate the updates at the top model level
-    grid_δt[:,:,1] .+= (CFt[:,:,1] .* (grid_p_full[:,:,1]./p0).^(Rd/cp).-grid_t_n[:,:,1])./(Δt)
-    grid_t[:,:,1]   .= CFt[:,:,1] .* (grid_p_full[:,:,1] ./p0) .^(Rd/cp)
+    """
+    grid_δt[:,:,1] .+= (CFt[:,:,1] .* (grid_p_full[:,:,1] ./p0).^(Rd/cp).-grid_t[:,:,1])./(Δt)
+    grid_t[:,:,1]   .=  CFt[:,:,1] .* (grid_p_full[:,:,1] ./p0) .^(Rd/cp)
+    """
     ### WARNING factor1 just factor, so it did  ./ ./ (2. .* Δt). 
     ### So did factor2
     factor2[:,:,1]        .= (CF[:,:,1] .- grid_tracers_n[:,:,1]) #./ (2. .* Δt)  # because CE at top = 0
     grid_δtracers[:,:,1] .+= (CF[:,:,1] .- grid_tracers_n[:,:,1]) ./ (Δt)
     grid_tracers_n[:,:,1] .= CF[:,:,1] 
     # Loop over the remaining level
-    for k in 2:20
+    for k in 2:19
+        """
         grid_δt[:,:,k] .+= (CE[:,:,k] .* grid_t_n[:,:,k-1] 
                             .* (p0 ./ grid_p_full[:,:,k-1]).^ (Rd/cp) .+ CFt[:,:,k]
-                            .* (grid_p_full[:,:,k]./p0).^(Rd/cp).-grid_t_n[:,:,k]./(Δt))
-        grid_t_n[:,:,1]   .= ((CE[:,:,k] .* grid_t_n[:,:,k-1] .* (p0 ./ grid_p_full[:,:,k-1]) .^ (Rd/cp) .+ CFt[:,:,k])
+                            .* (grid_p_full[:,:,k]./p0).^(Rd/cp).-grid_t[:,:,k]./(Δt))
+        grid_t_n[:,:,k]   .= ((CE[:,:,k] .* grid_t_n[:,:,k-1] .* (p0 ./ grid_p_full[:,:,k-1]) .^ (Rd/cp) .+ CFt[:,:,k])
                             .* (grid_p_full[:,:,k]./p0).^ (Rd/cp))
-        
+        """
         grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k]) ./ (Δt)
         factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_n[:,:,k])  #./ (2. .* Δt)
         grid_tracers_n[:,:,k]  .=  CE[:,:,k] .* grid_tracers_n[:,:,k-1] .+ CF[:,:,k]
@@ -715,10 +623,50 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     # @info maximum(CF), minimum(CF)
     ###
     ################################################################################
+
+    ###
+     new_grid_tracers_n_loc, mean_moisture_p_loc, mean_moisture_c_loc, mean_moisture_n_loc = Compute_Corrections!(semi_implicit, vert_coord, mesh, atmo_data, mean_ps_p, mean_energy_p,mean_moisture_p, 
+        grid_u_n, grid_v_n,
+        grid_energy_full, grid_ps_p,grid_ps,
+        grid_ps_n, spe_lnps_n, 
+        grid_t_n, spe_t_n, 
+        grid_tracers_p, grid_tracers_c, grid_tracers_n,
+        grid_t, grid_p_full, grid_p_half, grid_z_full, grid_u_p, grid_v_p, grid_geopots, grid_w_full, grid_t_p, dyn_data, grid_δt, factor1, factor2)
+
+    grid_tracers_n .= new_grid_tracers_n_loc
+    
+    # factor1 .= factor1_loc
+    # factor2 .= factor2_loc
+    # factor3 .= factor3_loc
+
+    add_water .= factor1 .+ factor2
+
+    # K_E .= K_E_loc
+    # pqpz .= pqpz_loc
+
+    # rho .= rho_loc
+
+    # qv_global_intergral_p = mean_moisture_p_loc
+    qv_global_intergral = mean_moisture_c_loc
+    # qv_global_intergral_n = mean_moisture_n_loc
+    
+    
     mean_moisture_n  =  mean_moisture_c_loc
     mean_moisture_c  =  mean_moisture_c_loc
     mean_moisture_p  =  mean_moisture_p_loc
     @info "#### mass correction:", (mean_moisture_p), (mean_moisture_c), (mean_moisture_n) , (mean_moisture_n - mean_moisture_p)
+    # @info "#### e04 mass correction:", (qv_global_intergral) #, (mean_moisture_n - mean_moisture_p)
+    ###
+
+    day_to_sec = 86400
+    if (integrator.time%day_to_sec == 0)
+        # dyn_data.grid_tracers_c[dyn_data.grid_tracers_c .< 0] .= 0
+        @info "Day: ", div(integrator.time,day_to_sec), " Max |U|,|V|,|P|,|T|,|qv|: ", maximum(abs.(dyn_data.grid_u_c)), maximum(abs.(dyn_data.grid_v_c)), maximum(dyn_data.grid_p_full), maximum(dyn_data.grid_t_c), maximum(dyn_data.grid_tracers_c)
+        @info "Day: ", div(integrator.time,day_to_sec), " Min |U|,|V|,|P|,|T|,|qv|: ", minimum(abs.(dyn_data.grid_u_c)), minimum(abs.(dyn_data.grid_v_c)), minimum(dyn_data.grid_p_full), minimum(dyn_data.grid_t_c), minimum(dyn_data.grid_tracers_c)
+    end
+    # original
+    Time_Advance!(dyn_data)
+
 
     # @info "min dyn.grid_tracers_c" minimum(dyn_data.grid_tracers_n)
     
