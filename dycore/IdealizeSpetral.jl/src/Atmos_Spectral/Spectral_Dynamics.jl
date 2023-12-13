@@ -119,10 +119,10 @@ function Compute_Corrections!(semi_implicit::Semi_Implicit_Solver, vert_coord::V
         mean_moisture_n  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_n, grid_ps_n)
         ###
         ### correct c
-        grid_tracers_c[grid_tracers_c .< 0.] .= 0.
-        mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
-        grid_tracers_c     .*= (mean_moisture_p / mean_moisture_c) 
-        grid_tracers_c[grid_tracers_c .< 0.] .= 0.
+        # grid_tracers_c[grid_tracers_c .< 0.] .= 0.
+        # mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
+        # grid_tracers_c     .*= (mean_moisture_p / mean_moisture_c) 
+        # grid_tracers_c[grid_tracers_c .< 0.] .= 0.
         mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
         ### 10/30 
         
@@ -866,8 +866,7 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     grid_p_half, grid_p_full = dyn_data.grid_p_half, dyn_data.grid_p_full
     grid_t_eq = dyn_data.grid_t_eq
 
-    grid_δtracers = dyn_data.grid_δtracers
-    spe_δtracers  = dyn_data.spe_δtracers
+
 
 
     ################
@@ -875,8 +874,8 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     ################
     grid_δps .= 0.0
 
-    spe_δtracers   .= 0.
-    grid_δtracers  .= 0.
+    grid_δtracers = dyn_data.grid_δtracers .* 0.
+    spe_δtracers  = dyn_data.spe_δtracers  .* 0.
 
     grid_δt .= 0.0 ### take from HS_forcing
 #################################################################################################
