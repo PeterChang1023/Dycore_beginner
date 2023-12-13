@@ -27,8 +27,8 @@ function Compute_Corrections_Init(vert_coord::Vert_Coordinate, mesh::Spectral_Sp
 
     if (do_water_correction)
         # error("water correction has not implemented")
-        mean_moisture_p     =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, (grid_tracers_p .+ grid_δtracers .* 2. .* Δt), grid_ps_p)
-
+        mean_moisture_p     =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, (grid_tracers_p + grid_δtracers * Δt), grid_ps_p)
+    
     end
     
     return mean_ps_p, mean_energy_p, mean_moisture_p 
@@ -357,33 +357,6 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     Rv = 461.
     Rd = 287.
     cp = 1004.
-    # # ### factor3
-    ### use n
-
-    # grid_δtracers .-= factor3 ./(2. .* Δt)
-    ### try
-    # @info maximum(grid_u)
-
-    ### 11/08
-    V_c  = zeros(((128,64,20)))
-    V_c .= (grid_u[:,:,:].^2 .+ grid_v[:,:,:].^2).^0.5
-    ### add moisture at surface following paper
-    ### ∂q_a/∂t = C_E * V_a * (q_sat,a - q_a) ./ z_a 
-    ### factor1
-    # cal rho
-    rho = zeros(((128,64,20)))
-    for i in 1:20
-        rho[:,:,i] .=  grid_p_full[:,:,i] ./ Rd ./ (grid_t[:,:,i])
-    end
-    # rho_s = zeros(((128,64,1)))
-    # rho_s[:,:,1] .=  grid_ps_n[:,:,1] ./ Rd ./ (grid_t[:,:,20])
-
-    # cal za
-    tv = zeros(((128,64,1)))
-    za = zeros(((128,64,1)))
-    tv[:,:,1] .= grid_t[:,:,20] .* (1. .+ 0.608 .* grid_tracers_c[:,:,20])
-
-    za[:,:,1] .= (Rd .* tv./9.81 .* (log.(grid_ps[:,:,1]) ./ ((grid_p_full[:,:,20] .+ grid_p_half[:,:,21]) ./ 2.) ) ./2)
     ### 
     ### try latent heat flux
         ### 12/11 add Sensible heat flux
@@ -411,34 +384,59 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     factor4 .= C_E .* V_c[:,:,20] .* grid_tracers_c_max[:,:,20] .* Δt ./ za[:,:,1] ./ (1. .+ C_E.*V_c[:,:,20] .* Δt./ za[:,:,1])
    """
     ###
-    grid_tracers_diff_new, condensation_rate_loc = HS_forcing_water_vapor!(semi_implicit, grid_tracers_n,  grid_t_n, grid_δt, grid_p_full, grid_u, grid_v, factor3, grid_δtracers, grid_tracers_c, grid_t, grid_tracers_p, grid_t_p)
-    grid_tracers_diff    .= grid_tracers_diff_new
-    condensation_rate    .= condensation_rate_loc
-    grid_tracers_c[grid_tracers_c .< 0] .= 0 
-    ##
 
 
-    grid_tracers_c_max  = deepcopy(grid_tracers_c)
-    grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) 
 
-    ### 1205 1205_25day_factor1_with_tracers_c_and_factor3_final.dat test factor1 use grid_tracers_c and grid_tracers_c_max and add on grid_δtracers, without factor2
-    factor1[:,:,20] .=  C_E .* V_c[:,:,20] .* (grid_tracers_c_max[:,:,20] .- min.(grid_tracers_c[:,:,20], grid_tracers_c_max[:,:,20])) ./ za[:,:,1] 
-    # grid_tracers_c[:,:,20] .+= factor1[:,:,20]
-    grid_δtracers[:,:,20] .+= factor1[:,:,20] ./(2. .* Δt)
-    # ###
+    
 #######################################################################################
 
-    grid_δtracers .= 0.
-    grid_δt       .= 0.
+
     
     mean_ps_p, mean_energy_p, mean_moisture_p = Compute_Corrections_Init(vert_coord, mesh, atmo_data,
     grid_u_p, grid_v_p, grid_ps_p, grid_t_p, 
     grid_δu, grid_δv, grid_δt,  
     Δt, grid_energy_full, grid_tracers_p, grid_tracers_c, grid_δtracers, grid_tracers_full)
 
+    # grid_δtracers .= 0.
+    # grid_δt       .= 0.
     # compute pressure based on grid_ps -> grid_p_half, grid_lnp_half, grid_p_full, grid_lnp_full 
     Pressure_Variables!(vert_coord, grid_ps, grid_p_half, grid_Δp, grid_lnp_half, grid_p_full, grid_lnp_full)
+    ###########
+    ### 11/08
+    V_c  = zeros(((128,64,20)))
+    V_c .= (grid_u[:,:,:].^2 .+ grid_v[:,:,:].^2).^0.5
+    ### add moisture at surface following paper
+    ### ∂q_a/∂t = C_E * V_a * (q_sat,a - q_a) ./ z_a 
+    ### factor1
+    # cal rho
+    rho = zeros(((128,64,20)))
+    for i in 1:20
+        rho[:,:,i] .=  grid_p_full[:,:,i] ./ Rd ./ (grid_t[:,:,i])
+    end
 
+    # cal za
+    tv = zeros(((128,64,1)))
+    za = zeros(((128,64,1)))
+    tv[:,:,1] .= grid_t[:,:,20] .* (1. .+ 0.608 .* grid_tracers_c[:,:,20])
+
+    za[:,:,1] .= Rd .* tv./9.81 .* log.((grid_ps[:,:,1]) ./ ((grid_p_full[:,:,20] .+ grid_p_half[:,:,21]) ./ 2.))
+    #############
+    grid_tracers_diff_new, condensation_rate_loc = HS_forcing_water_vapor!(semi_implicit, grid_tracers_n,  grid_t_n, grid_δt, grid_p_full, grid_u, grid_v, factor3, grid_δtracers, grid_tracers_c, grid_t, grid_tracers_p, grid_t_p)
+    grid_tracers_diff    .= grid_tracers_diff_new
+    condensation_rate    .= condensation_rate_loc
+    grid_tracers_c[grid_tracers_c .< 0] .= 0 
+    ##
+    grid_tracers_c_max  = deepcopy(grid_tracers_c)
+    grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) 
+
+    ## 1205 1205_25day_factor1_with_tracers_c_and_factor3_final.dat test factor1 use grid_tracers_c and grid_tracers_c_max and add on grid_δtracers, without factor2
+    factor1[:,:,20] .=  C_E .* V_c[:,:,20] .* (grid_tracers_c_max[:,:,20] .- min.(grid_tracers_c[:,:,20], grid_tracers_c_max[:,:,20])) ./ za[:,:,1] 
+    @info maximum(za[:,:,1])
+    @info minimum(za[:,:,1])
+    
+    # grid_tracers_c[:,:,20] .+= factor1[:,:,20].*(2. .* Δt)
+    grid_δtracers[:,:,20] .+= factor1[:,:,20] #.* (2. .* Δt)
+    ##############
     # compute ∇ps = ∇lnps * ps
     Compute_Gradients!(mesh, spe_lnps_c,  grid_dλ_ps, grid_dθ_ps)
     grid_dλ_ps .*= grid_ps
@@ -469,23 +467,7 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     grid_δv  .+= grid_δQ
     Vert_Advection!(vert_coord, grid_t, grid_Δp, grid_M_half, Δt, vert_coord.vert_advect_scheme, grid_δQ)
     grid_δt  .+= grid_δQ
-    """
-    ### By CJY2
-    Vert_Advection!(vert_coord, grid_tracers_c, grid_Δp, grid_M_half, Δt, vert_coord.vert_advect_scheme,  grid_δQ)
-    grid_δtracers .+= grid_δQ 
-    ### spectral tracers need to be done first 
-    Add_Horizontal_Advection!(mesh, spe_tracers_c, grid_u, grid_v, grid_δtracers) 
-    Trans_Grid_To_Spherical!(mesh, grid_δtracers, spe_δtracers)
-    Compute_Spectral_Damping!(integrator, spe_tracers_c, spe_tracers_p, spe_δtracers)
-    Filtered_Leapfrog!(integrator, spe_δtracers, spe_tracers_p, spe_tracers_c, spe_tracers_n)
-    Trans_Spherical_To_Grid!(mesh, spe_tracers_n, grid_tracers_n)
-    """
-    ### original grid_tracers_diff
-    # grid_tracers_diff_new = HS_forcing_water_vapor!(semi_implicit, grid_tracers_n,  grid_t_n, grid_δt, grid_p_full, grid_u, grid_v, factor3)
-    # grid_tracers_diff    .= grid_tracers_diff_new
-    ### 10/30
-    # @info maximum(grid_tracers_diff)
-    ###
+
     Add_Horizontal_Advection!(mesh, spe_t_c, grid_u, grid_v, grid_δt)
     Trans_Grid_To_Spherical!(mesh, grid_δt, spe_δt)
    
@@ -527,9 +509,9 @@ function Spectral_Dynamics!(mesh::Spectral_Spherical_Mesh,  vert_coord::Vert_Coo
     Trans_Spherical_To_Grid!(mesh, spe_vor_n, grid_vor)
     Trans_Spherical_To_Grid!(mesh, spe_div_n, grid_div)
     UV_Grid_From_Vor_Div!(mesh, spe_vor_n, spe_div_n, grid_u_n, grid_v_n)
+    Trans_Spherical_To_Grid!(mesh, spe_t_n, grid_t_n) 
     Trans_Spherical_To_Grid!(mesh, spe_lnps_n, grid_lnps)
     grid_ps_n .= exp.(grid_lnps)
-    Trans_Spherical_To_Grid!(mesh, spe_t_n, grid_t_n) 
 
 
     # function update_tracers!
@@ -922,7 +904,7 @@ function HS_forcing_water_vapor!(semi_implicit::Semi_Implicit_Solver, grid_trace
     grid_tracers_diff  .= (max.(grid_tracers_c, grid_tracers_c_max) .- grid_tracers_c_max) 
     condensation_rate = (grid_tracers_diff)./ (1. .+ (Lv/cp)*(Lv .* grid_tracers_c_max ./ (Rv .* grid_t.^2))) ./ (2 .* Δt)
     # grid_tracers_c .-= condensation_rate .* (2. * Δt)
-    grid_δtracers .-= condensation_rate # ./ (2 .* Δt)
+    # grid_δtracers .-= condensation_rate # ./ (2 .* Δt)
     
 
 
@@ -959,9 +941,11 @@ function HS_forcing_water_vapor!(semi_implicit::Semi_Implicit_Solver, grid_trace
     ### let grid_tracers_diff be the C (condensation rate)
     ### original
     #grid_tracers_diff  .= factor3 #./ (1 .+ Lv ./ cp .* Lv .* grid_tracers_c_max ./ Rv ./ grid_t .^2) #./ (2*Δt)
-    factor3 .= condensation_rate #.* (2. * Δt)
-    grid_δt  .+= (condensation_rate  .* Lv ./ cp) ./day_to_sec .* L 
+    factor3   .= condensation_rate #.* (2. * Δt)
+    # grid_δt  .+= (condensation_rate  .* Lv ./ cp) ./day_to_sec .* L 
     # grid_t  .+= (condensation_rate .* (2. * Δt) .* Lv ./ cp) ./day_to_sec .* L 
+
+    
     ###
     return grid_tracers_diff, condensation_rate
 end
@@ -979,7 +963,18 @@ function qv_to_e_2D(qv::Array{Float64, 2}, grid_P::Array{Float64, 2})
     return (qv .* grid_P) ./ (0.378 .* qv .+ 0.622)
 end
 
-
+#     # function update_tracers!
+#     ### By CJY2
+#     Vert_Advection!(vert_coord, grid_tracers_c, grid_Δp, grid_M_half, Δt, vert_coord.vert_advect_scheme,  grid_δQ)
+#     grid_δtracers .+= grid_δQ 
+#     ### spectral tracers need to be done first 
+#     Add_Horizontal_Advection!(mesh, spe_tracers_c, grid_u, grid_v, grid_δtracers) 
+#     Trans_Grid_To_Spherical!(mesh, grid_δtracers, spe_δtracers)
+#     Compute_Spectral_Damping!(integrator, spe_tracers_c, spe_tracers_p, spe_δtracers)
+#     Filtered_Leapfrog!(integrator, spe_δtracers, spe_tracers_p, spe_tracers_c, spe_tracers_n)
+#     Trans_Spherical_To_Grid!(mesh, spe_tracers_n, grid_tracers_n)
+# function update_tracers!(vert_coord, mesh, integrator, 
+        
 # function Spectral_Dynamics_Main()
 #   # the decay of a sinusoidal disturbance to a zonally symmetric flow 
 #   # that resembles that found in the upper troposphere in Northern winter.
