@@ -104,6 +104,8 @@ mutable struct Output_Manager
 
     qv_global_intergral_xyzt::Array{Float64, 1}
     condensation_rate_xyzt::Array{Float64, 4}
+
+    precip_xyt::Array{Float64, 3}
     
 
 
@@ -208,13 +210,14 @@ function Output_Manager(mesh::Spectral_Spherical_Mesh, vert_coord::Vert_Coordina
 
     qv_global_intergral_xyzt = zeros(Float64, n_day)
     condensation_rate_xyzt   = zeros(Float64, nλ,  nθ, nd, n_day)
+    precip_xyt              = zeros(Float64, nλ,  nθ, n_day)
 
     Output_Manager(nλ, nθ, nd, n_day,
     day_to_sec, start_time, end_time, current_time, spinup_day,
     λc, θc, σc,
     t_daily_zonal_mean, t_eq_daily_zonal_mean, u_daily_zonal_mean, v_daily_zonal_mean, 
     ps_daily_mean, n_daily_mean, 
-    t_zonal_mean,t_eq_zonal_mean, u_zonal_mean, v_zonal_mean, ps_mean, grid_u_c_xyzt, grid_v_c_xyzt, grid_t_c_xyzt, grid_t_eq_xyzt, grid_geopots_xyzt, grid_ps_xyzt, spe_vor_c_xyzt, spe_div_c_xyzt, grid_lnps_xyzt, grid_p_half_xyzt, grid_Δp_xyzt,  grid_lnp_half_xyzt,  grid_p_full_xyzt, grid_lnp_full_xyzt, spe_lnps_c_xyzt, spe_lnps_p_xyzt, grid_tracers_n_xyz1t, grid_tracers_c_xyz1t, grid_tracers_p_xyz1t,  grid_tracers_diff_xyz1t, spe_tracers_n_xyz1t, spe_tracers_c_xyz1t, spe_tracers_p_xyz1t, grid_w_full_xyzt, grid_vor_c_xyzt, grid_δu_xyzt, grid_δv_xyzt, grid_δt_xyzt, grid_δps_xyzt, grid_t_eq_ref_xyzt, grid_z_full_xyzt, grid_z_half_xyzt, unsaturated_n_xyzt, add_water_xyzt, factor1_xyzt, factor2_xyzt, factor3_xyzt, factor4_xyzt, K_E_xyzt, pqpz_xyzt, rho_xyzt, qv_global_intergral_xyzt, condensation_rate_xyzt)
+    t_zonal_mean,t_eq_zonal_mean, u_zonal_mean, v_zonal_mean, ps_mean, grid_u_c_xyzt, grid_v_c_xyzt, grid_t_c_xyzt, grid_t_eq_xyzt, grid_geopots_xyzt, grid_ps_xyzt, spe_vor_c_xyzt, spe_div_c_xyzt, grid_lnps_xyzt, grid_p_half_xyzt, grid_Δp_xyzt,  grid_lnp_half_xyzt,  grid_p_full_xyzt, grid_lnp_full_xyzt, spe_lnps_c_xyzt, spe_lnps_p_xyzt, grid_tracers_n_xyz1t, grid_tracers_c_xyz1t, grid_tracers_p_xyz1t,  grid_tracers_diff_xyz1t, spe_tracers_n_xyz1t, spe_tracers_c_xyz1t, spe_tracers_p_xyz1t, grid_w_full_xyzt, grid_vor_c_xyzt, grid_δu_xyzt, grid_δv_xyzt, grid_δt_xyzt, grid_δps_xyzt, grid_t_eq_ref_xyzt, grid_z_full_xyzt, grid_z_half_xyzt, unsaturated_n_xyzt, add_water_xyzt, factor1_xyzt, factor2_xyzt, factor3_xyzt, factor4_xyzt, K_E_xyzt, pqpz_xyzt, rho_xyzt, qv_global_intergral_xyzt, condensation_rate_xyzt, precip_xyt)
 end
 
 function Update_Output!(output_manager::Output_Manager, dyn_data::Dyn_Data, current_time::Int64)
@@ -293,6 +296,8 @@ function Update_Output!(output_manager::Output_Manager, dyn_data::Dyn_Data, curr
     qv_global_intergral_xyzt = output_manager.qv_global_intergral_xyzt
 
     condensation_rate_xyzt   = output_manager.condensation_rate_xyzt
+
+    precip_xyt = output_manager.precip_xyt
 
 
     
@@ -377,6 +382,8 @@ function Update_Output!(output_manager::Output_Manager, dyn_data::Dyn_Data, curr
     qv_global_intergral_xyzt[i_day] = dyn_data.qv_global_intergral
     condensation_rate_xyzt[:,:,:,i_day] = dyn_data.condensation_rate
 
+     precip_xyt[:,:,i_day] = dyn_data.precip
+
     n_daily_mean[i_day] += 1
 end
 
@@ -453,6 +460,8 @@ function Finalize_Output!(output_manager::Output_Manager, save_file_name::String
     qv_global_intergral_xyzt = output_manager.qv_global_intergral_xyzt
     condensation_rate_xyzt   = output_manager.condensation_rate_xyzt
 
+    precip_xyt = output_manager.precip_xyt
+
 
 
     for i_day = 1:n_day
@@ -476,11 +485,11 @@ function Finalize_Output!(output_manager::Output_Manager, save_file_name::String
     ps_mean .= dropdims(mean(ps_daily_mean[:,:,spinup_day+1:n_day], dims=3), dims=3)
        
     if save_file_name != "None"
-        @save save_file_name grid_u_c_xyzt grid_v_c_xyzt grid_t_c_xyzt grid_t_eq_xyzt grid_geopots_xyzt grid_ps_xyzt spe_vor_c_xyzt spe_div_c_xyzt grid_lnps_xyzt grid_p_half_xyzt grid_Δp_xyzt grid_lnp_half_xyzt grid_p_full_xyzt grid_lnp_full_xyzt spe_lnps_c_xyzt spe_lnps_p_xyzt grid_tracers_c_xyz1t grid_tracers_n_xyz1t grid_tracers_p_xyz1t grid_tracers_diff_xyz1t grid_w_full_xyzt grid_vor_c_xyzt grid_δu_xyzt grid_δv_xyzt grid_δt_xyzt grid_δps_xyzt grid_t_eq_ref_xyzt grid_z_full_xyzt grid_z_half_xyzt unsaturated_n_xyzt add_water_xyzt factor1_xyzt factor2_xyzt factor3_xyzt factor4_xyzt K_E_xyzt pqpz_xyzt rho_xyzt qv_global_intergral_xyzt condensation_rate_xyzt
+        @save save_file_name grid_u_c_xyzt grid_v_c_xyzt grid_t_c_xyzt grid_t_eq_xyzt grid_geopots_xyzt grid_ps_xyzt spe_vor_c_xyzt spe_div_c_xyzt grid_lnps_xyzt grid_p_half_xyzt grid_Δp_xyzt grid_lnp_half_xyzt grid_p_full_xyzt grid_lnp_full_xyzt spe_lnps_c_xyzt spe_lnps_p_xyzt grid_tracers_c_xyz1t grid_tracers_n_xyz1t grid_tracers_p_xyz1t grid_tracers_diff_xyz1t grid_w_full_xyzt grid_vor_c_xyzt grid_δu_xyzt grid_δv_xyzt grid_δt_xyzt grid_δps_xyzt grid_t_eq_ref_xyzt grid_z_full_xyzt grid_z_half_xyzt unsaturated_n_xyzt add_water_xyzt factor1_xyzt factor2_xyzt factor3_xyzt factor4_xyzt K_E_xyzt pqpz_xyzt rho_xyzt qv_global_intergral_xyzt condensation_rate_xyzt precip_xyt
     end
 
     if mean_save_file_name != "None"
-        @save mean_save_file_name grid_u_c_xyzt grid_v_c_xyzt grid_t_c_xyzt grid_t_eq_xyzt grid_geopots_xyzt grid_ps_xyzt spe_vor_c_xyzt spe_div_c_xyzt grid_lnps_xyzt grid_p_half_xyzt grid_Δp_xyzt grid_lnp_half_xyzt grid_p_full_xyzt grid_lnp_full_xyzt spe_lnps_c_xyzt spe_lnps_p_xyzt grid_tracers_c_xyz1t grid_tracers_n_xyz1t grid_tracers_p_xyz1t grid_tracers_diff_xyz1t grid_w_full_xyzt grid_vor_c_xyzt grid_δu_xyzt grid_δv_xyzt grid_δt_xyzt grid_δps_xyzt grid_t_eq_ref_xyzt grid_z_full_xyzt grid_z_half_xyzt unsaturated_n_xyzt add_water_xyzt factor1_xyzt factor2_xyzt factor3_xyzt factor4_xyzt K_E_xyzt pqpz_xyzt rho_xyzt qv_global_intergral_xyzt condensation_rate_xyzt
+        @save mean_save_file_name grid_u_c_xyzt grid_v_c_xyzt grid_t_c_xyzt grid_t_eq_xyzt grid_geopots_xyzt grid_ps_xyzt spe_vor_c_xyzt spe_div_c_xyzt grid_lnps_xyzt grid_p_half_xyzt grid_Δp_xyzt grid_lnp_half_xyzt grid_p_full_xyzt grid_lnp_full_xyzt spe_lnps_c_xyzt spe_lnps_p_xyzt grid_tracers_c_xyz1t grid_tracers_n_xyz1t grid_tracers_p_xyz1t grid_tracers_diff_xyz1t grid_w_full_xyzt grid_vor_c_xyzt grid_δu_xyzt grid_δv_xyzt grid_δt_xyzt grid_δps_xyzt grid_t_eq_ref_xyzt grid_z_full_xyzt grid_z_half_xyzt unsaturated_n_xyzt add_water_xyzt factor1_xyzt factor2_xyzt factor3_xyzt factor4_xyzt K_E_xyzt pqpz_xyzt rho_xyzt qv_global_intergral_xyzt condensation_rate_xyzt precip_xyt
     end
 end
 
