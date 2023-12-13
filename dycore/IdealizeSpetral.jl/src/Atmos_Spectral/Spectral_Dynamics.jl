@@ -119,10 +119,10 @@ function Compute_Corrections!(semi_implicit::Semi_Implicit_Solver, vert_coord::V
         mean_moisture_n  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_n, grid_ps_n)
         ###
         ### correct c
-        # grid_tracers_c[grid_tracers_c .< 0.] .= 0.
-        # mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
-        # grid_tracers_c     .*= (mean_moisture_p / mean_moisture_c) 
-        # grid_tracers_c[grid_tracers_c .< 0.] .= 0.
+        grid_tracers_c[grid_tracers_c .< 0.] .= 0.
+        mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
+        grid_tracers_c     .*= (mean_moisture_p / mean_moisture_c) 
+        grid_tracers_c[grid_tracers_c .< 0.] .= 0.
         mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
         ### 10/30 
         
@@ -869,11 +869,16 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     grid_δtracers = dyn_data.grid_δtracers
     spe_δtracers  = dyn_data.spe_δtracers
 
-    
+
+    ################
+    # only grid_δps, grid_δtracers, grid_δt need to be recount !!!
+    ################
     grid_δps .= 0.0
 
     spe_δtracers   .= 0.
     grid_δtracers  .= 0.
+
+    grid_δt .= 0.0 ### take from HS_forcing
 #################################################################################################
     # spectral equation quantities
     spe_lnps_p, spe_lnps_c, spe_lnps_n, spe_δlnps = dyn_data.spe_lnps_p, dyn_data.spe_lnps_c, dyn_data.spe_lnps_n, dyn_data.spe_δlnps
@@ -953,7 +958,7 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     qv_global_intergral = dyn_data.qv_global_intergral
         
     # incremental quantities
-    grid_δu, grid_δv, grid_δps, grid_δlnps, grid_δt = dyn_data.grid_δu, dyn_data.grid_δv, dyn_data.grid_δps, dyn_data.grid_δlnps, dyn_data.grid_δt
+    # grid_δu, grid_δv, grid_δps, grid_δlnps, grid_δt = dyn_data.grid_δu, dyn_data.grid_δv, dyn_data.grid_δps, dyn_data.grid_δlnps, dyn_data.grid_δt
 
     integrator = semi_implicit.integrator
     Δt = Get_Δt(integrator)
