@@ -27,7 +27,7 @@ function Compute_Corrections_Init(vert_coord::Vert_Coordinate, mesh::Spectral_Sp
 
     if (do_water_correction)
         # error("water correction has not implemented")
-        mean_moisture_p     =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_p .+ grid_δtracers * Δt, grid_ps_p)
+        mean_moisture_p     =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_p .+ Δt.*grid_δt , grid_ps_p)
     
     end
     
@@ -78,7 +78,7 @@ function Compute_Corrections!(semi_implicit::Semi_Implicit_Solver, vert_coord::V
     Δt = Get_Δt(integrator)
 
     if (do_water_correction) 
-        # ### original ###
+        # # ### original ###
         # factor11             = zeros(((128,64,20)))
         # factor11            .= factor1 .+ factor2
         # # @info maximum(factor11), minimum(factor11)
@@ -101,7 +101,7 @@ function Compute_Corrections!(semi_implicit::Semi_Implicit_Solver, vert_coord::V
         #     grid_tracers_n[grid_tracers_n .< 0.] .= 0.
         #     @info "plus"
         # end
-        #
+        
 
         # mean_factor_all_n      =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, factor_all, grid_ps_n)
         # mean_moisture_n       =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_n, grid_ps_n)
@@ -111,7 +111,7 @@ function Compute_Corrections!(semi_implicit::Semi_Implicit_Solver, vert_coord::V
         # mean_factor_all_n      =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, factor_all, grid_ps_n)
         # factor_all           .*= (mean_moisture_p-mean_moisture_n)/mean_factor_all_n
 
-        ### correction n
+        ## correction n
         grid_tracers_n[grid_tracers_n .< 0.] .= 0.
         mean_moisture_n       =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_n, grid_ps_n)
         grid_tracers_n     .*= (mean_moisture_p / mean_moisture_n) 
@@ -119,10 +119,10 @@ function Compute_Corrections!(semi_implicit::Semi_Implicit_Solver, vert_coord::V
         mean_moisture_n  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_n, grid_ps_n)
         ###
         ### correct c
-        grid_tracers_c[grid_tracers_c .< 0.] .= 0.
-        mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
-        grid_tracers_c     .*= (mean_moisture_p / mean_moisture_c) 
-        grid_tracers_c[grid_tracers_c .< 0.] .= 0.
+        # grid_tracers_c[grid_tracers_c .< 0.] .= 0.
+        # mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
+        # grid_tracers_c     .*= (mean_moisture_p / mean_moisture_c) 
+        # grid_tracers_c[grid_tracers_c .< 0.] .= 0.
         mean_moisture_c  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, grid_tracers_c, grid_ps_c)
         ### 10/30 
         
@@ -987,7 +987,7 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     za = zeros(((128,64,1)))
     tv[:,:,1] .= grid_t[:,:,20] .* (1. .+ 0.608 .* grid_tracers_c[:,:,20])
 
-    za[:,:,1] .= Rd .* tv./9.81 .* log.((grid_ps[:,:,1]) ./ ((grid_p_full[:,:,20] .+ grid_p_half[:,:,21]) ./ 2.)) ./2
+    za[:,:,1] .= Rd .* tv./9.81 .* log.((grid_ps[:,:,1]) ./ ((grid_p_full[:,:,20] .+ grid_p_half[:,:,21]) ./ 2.)) ./2 
     #############
     ### try latent heat flux
         ### 12/11 add Sensible heat flux
@@ -1034,16 +1034,18 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     @info "min za:",minimum(za[:,:,1])
     
     # grid_tracers_c[:,:,20] .+= factor1[:,:,20].*(2. .* Δt)
-    factor3 = dyn_data.factor3
-    grid_ps_c = dyn_data.grid_ps_c
-    mean_moisture_factor1  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, factor1, grid_ps_c)
-    mean_moisture_factor3  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, factor3, grid_ps_c)
+    # factor3 = dyn_data.factor3
+    # grid_ps_c = dyn_data.grid_ps_c
+    # mean_moisture_factor1  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, factor1, grid_ps_c)
+    # mean_moisture_factor3  =  Mass_Weighted_Global_Integral(vert_coord, mesh, atmo_data, factor3, grid_ps_c)
     
     
-    factor1_final = zeros(((128,64,20)))
-    factor1_final[:,:,20] .= factor1[:,:,20] .*  mean_moisture_factor3 ./ mean_moisture_factor1
+    # factor1_final = zeros(((128,64,20)))
+    # factor1_final[:,:,20] .= factor1[:,:,20] .*  mean_moisture_factor3 ./ mean_moisture_factor1
     
-    grid_δtracers[:,:,20] .+= factor1_final[:,:,20] #./ (2. .* Δt)
+    # grid_δtracers[:,:,20] .+= factor1[:,:,20] #./ (2. .* Δt)
+    grid_tracers_c[:,:,20] .+= factor1[:,:,20] .* (2. .* Δt)
+    
     # @info "factor3/factor1", (mean_moisture_factor3 ./ mean_moisture_factor1)
     # @info "min final1:", minimum(mean_moisture_factor1)
     
@@ -1123,7 +1125,7 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     # # @info maximum(CE), minimum(CE)
     # # @info maximum(CF), minimum(CF)
     # ###
-    ################################################################################
+    # ###############################################################################
 
     
 #######################################################################################
@@ -1174,8 +1176,8 @@ function HS_forcing_water_vapor!(semi_implicit::Semi_Implicit_Solver, grid_trace
     grid_tracers_c_max .= (0.622 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) ./ (grid_p_full .- 0.378 .* (611.12 .* exp.(Lv ./ Rv .* (1. ./ 273.15 .- 1. ./ grid_t)) )) 
     grid_tracers_diff  .= (max.(grid_tracers_c, grid_tracers_c_max) .- grid_tracers_c_max) 
     condensation_rate = (grid_tracers_diff)./ (1. .+ (Lv/cp)*(Lv .* grid_tracers_c_max ./ (Rv .* grid_t.^2))) ./ (2 .* Δt)
-    # grid_tracers_c .-= condensation_rate .* (2. * Δt)
-    grid_δtracers .-= condensation_rate #.* (2 .* Δt)
+    grid_tracers_c .-= grid_tracers_diff #.* (2. * Δt)
+    # grid_δtracers .-= grid_tracers_diff ./ (2 .* Δt)
     # @info "max condensation rate:", maximum(condensation_rate)
     # @info "min condensation rate:", minimum(condensation_rate)
 
@@ -1212,9 +1214,9 @@ function HS_forcing_water_vapor!(semi_implicit::Semi_Implicit_Solver, grid_trace
     ### let grid_tracers_diff be the C (condensation rate)
     ### original
     #grid_tracers_diff  .= factor3 #./ (1 .+ Lv ./ cp .* Lv .* grid_tracers_c_max ./ Rv ./ grid_t .^2) #./ (2*Δt)
-    factor3   .= (condensation_rate  .* Lv ./ cp) .* L ./ (day_to_sec) #.* (2. * Δt)
-    grid_δt  .+= (condensation_rate  .* Lv ./ cp) .* L ./ (day_to_sec) 
-    # grid_t  .+= (condensation_rate .* (2. * Δt) .* Lv ./ cp) ./day_to_sec .* L 
+    factor3   .= (grid_tracers_diff  .* Lv ./ cp) .* L ./ (day_to_sec) #.* (2. * Δt)
+    grid_δt  .+= (grid_tracers_diff  .* Lv ./ cp) .* L ./ (day_to_sec) ./ (2. * Δt)
+    # grid_t  .+= (grid_tracers_diff  .* Lv ./ cp) ./day_to_sec .* L  # .* (2. * Δt)
 
     
     ###
