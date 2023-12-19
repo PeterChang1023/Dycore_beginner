@@ -52,7 +52,7 @@ function HS_Forcing!(atmo_data::Atmo_Data, Δt::Int64, sinθ::Array{Float64, 1},
                         σ_b, k_f)
 
     #todo 
-    # grid_δt .= 0.0
+    grid_δt .= 0.0
     do_conserve_energy = true
     if (do_conserve_energy) 
         cp_air = atmo_data.cp_air

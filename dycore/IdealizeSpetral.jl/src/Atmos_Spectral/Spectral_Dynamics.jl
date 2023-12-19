@@ -1025,17 +1025,17 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     ### try latent heat flux
         ### 12/11 add Sensible heat flux
     # step 1. set Sea surface temperature
-    # θc = mesh.θc
-    # Tsurf = zeros((128,64))
-    # Tsurf .= grid_t[:,:,20]
-    # for i in 1:64
-    #     Tsurf[:,i] .= 29. .* exp.(-θc[i] .^2.) ./ (2 * (26. * pi / 180.)^2.) .+ 271.
-    # end
+    θc = mesh.θc
+    Tsurf = zeros((128,64))
+    Tsurf .= grid_t[:,:,20]
+    for i in 1:64
+        Tsurf[:,i] .= 29. .* exp.(-θc[i] .^2.) ./ (2 * (26. * pi / 180.)^2.) .+ 271.
+    end
 
-    # grid_δt[:,:,20] .+= ((grid_t[:,:,20] .+ C_E .* V_c[:,:,20] .* (Tsurf[:,:]) .* Δt ./ za[:,:,1]
-                       # ./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_t[:,:,20]) ./ Δt)
+    grid_δt[:,:,20] .+= ((grid_t[:,:,20] .+ C_E .* V_c[:,:,20] .* (Tsurf[:,:]) .* Δt ./ za[:,:,1]
+                       ./ (1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1]) .- grid_t[:,:,20]) ./ Δt)
     # grid_t[:,:,20] .+= ((C_E .* V_c[:,:,1] .* Tsurf[:,:] .* Δt ./ za) 
-                       # ./ ((1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1])))
+    #                    ./ ((1. .+ C_E .* V_c[:,:,20] .* Δt ./ za[:,:,1])))
     
     # add latent heat flux
     
@@ -1094,15 +1094,15 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
         CE[:,:,k]    .= CC[:,:,k] ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1])
         CF[:,:,k]    .= ((grid_tracers_p[:,:,k] .+ CA[:,:,k] .* CF[:,:,k+1])
                         ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
-        # CFt[:,:,k]   .= ((p0./grid_p_full[:,:,k]).^(Rd/cp) .* grid_t[:,:,k] .+ CA[:,:,k] .* CFt[:,:,k+1]
-        #                 ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
+        CFt[:,:,k]   .= ((p0./grid_p_full[:,:,k]).^(Rd/cp) .* grid_t[:,:,k] .+ CA[:,:,k] .* CFt[:,:,k+1]
+                        ./ (1. .+ CA[:,:,k] .+ CC[:,:,k] .- CA[:,:,k] .* CE[:,:,k+1]))
     end
     # @info maximum(CE)
     # @info maximum(CF)
         # first calculate the updates at the top model level
     
-    # grid_δt[:,:,1] .+= (CFt[:,:,1] .* (grid_p_full[:,:,1] ./p0).^(Rd/cp).-grid_t[:,:,1])./(Δt)
-    # grid_t[:,:,1]   .=  CFt[:,:,1] .* (grid_p_full[:,:,1] ./p0) .^(Rd/cp)
+    grid_δt[:,:,1] .+= (CFt[:,:,1] .* (grid_p_full[:,:,1] ./p0).^(Rd/cp).-grid_t[:,:,1])./(Δt)
+    grid_t[:,:,1]   .=  CFt[:,:,1] .* (grid_p_full[:,:,1] ./p0) .^(Rd/cp)
     
     ### WARNING factor1 just factor, so it did  ./ ./ (2. .* Δt). 
     ### So did factor2
@@ -1112,11 +1112,11 @@ function Spectral_Dynamics_Physics!(atmo_data::Atmo_Data, mesh::Spectral_Spheric
     # Loop over the remaining level
     for k in 2:19
         
-        # grid_δt[:,:,k] .+= (CE[:,:,k] .* grid_t_n[:,:,k-1] 
-        #                     .* (p0 ./ grid_p_full[:,:,k-1]).^ (Rd/cp) .+ CFt[:,:,k]
-        #                     .* (grid_p_full[:,:,k]./p0).^(Rd/cp).-grid_t[:,:,k]./(Δt))
-        # grid_t_n[:,:,k]   .= ((CE[:,:,k] .* grid_t_n[:,:,k-1] .* (p0 ./ grid_p_full[:,:,k-1]) .^ (Rd/cp) .+ CFt[:,:,k])
-        #                     .* (grid_p_full[:,:,k]./p0).^ (Rd/cp))
+        grid_δt[:,:,k] .+= (CE[:,:,k] .* grid_t_n[:,:,k-1] 
+                            .* (p0 ./ grid_p_full[:,:,k-1]).^ (Rd/cp) .+ CFt[:,:,k]
+                            .* (grid_p_full[:,:,k]./p0).^(Rd/cp).-grid_t[:,:,k]./(Δt))
+        grid_t_n[:,:,k]   .= ((CE[:,:,k] .* grid_t_n[:,:,k-1] .* (p0 ./ grid_p_full[:,:,k-1]) .^ (Rd/cp) .+ CFt[:,:,k])
+                            .* (grid_p_full[:,:,k]./p0).^ (Rd/cp))
         
         # grid_δtracers[:,:,k]  .+= (CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_c[:,:,k]) ./ (2. .* Δt)
         factor2[:,:,k]         .= (CE[:,:,k] .* grid_tracers_c[:,:,k-1] .+ CF[:,:,k] .- grid_tracers_c[:,:,k])  #./ (2. .* Δt)
@@ -1214,9 +1214,9 @@ function HS_forcing_water_vapor!(semi_implicit::Semi_Implicit_Solver, grid_trace
     ### let grid_tracers_diff be the C (condensation rate)
     ### original
     #grid_tracers_diff  .= factor3 #./ (1 .+ Lv ./ cp .* Lv .* grid_tracers_c_max ./ Rv ./ grid_t .^2) #./ (2*Δt)
-    factor3   .= (grid_tracers_diff  .* Lv ./ cp) .* L ./ (day_to_sec) #.* (2. * Δt)
-    grid_δt  .+= (grid_tracers_diff  .* Lv ./ cp) .* L ./ (day_to_sec) ./ (2. * Δt)
-    # grid_t  .+= (grid_tracers_diff  .* Lv ./ cp) ./day_to_sec .* L  # .* (2. * Δt)
+    factor3   .= (grid_tracers_diff)  #.* Lv ./ cp) .* L ./ (day_to_sec) #.* (2. * Δt)
+    # grid_δt  .+= (condensation_rate  .* Lv ./ cp) .* L #./ (day_to_sec) #./ (2. * Δt)
+    grid_t  .+= (grid_tracers_diff  .* Lv ./ cp) ./day_to_sec .* L   #.* (2. * Δt)
 
     
     ###
