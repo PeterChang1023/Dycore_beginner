@@ -76,7 +76,7 @@ function Newtonian_Damping!(atmo_data::Atmo_Data, sinθ::Array{Float64,1}, grid_
     nλ, nθ, nd = size(grid_δt)
     
     day_to_sec = 86400
-    t_zero, t_strat = 315.0, 200.0  ### 315.0, 200.0
+    t_zero, t_strat = 294.0, 200.0  ### 315.0, 200.0
     k_a, k_s = k_a/day_to_sec,  k_s/day_to_sec#s^-1
     
     p_ref = 1.0e5
